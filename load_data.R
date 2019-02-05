@@ -1,5 +1,9 @@
-#setting up the defaults
-knitr::opts_chunk$set(echo = TRUE, results = "asis")
+# set working directory (change this to fit your needs)
+setwd("E:/coursera/Exploratory Data Analysis_1")
+
+# required packages
+library(data.table)
+library(lubridate)
 
 # make sure the sources data folder exists
 if (!file.exists('source data')) {
@@ -14,28 +18,29 @@ if (!file.exists('source data/power_consumption.txt')) {
   download.file(file.url,destfile='source data/power_consumption.zip')
   unzip('source data/power_consumption.zip',exdir='source data',overwrite=TRUE)
   
-  t <- read.table("household_power_consumption.txt", header=TRUE, sep=";", na.strings = "?", colClasses = c('character','character','numeric','numeric','numeric','numeric','numeric','numeric','numeric'))
+  # read the raw table and limit to 2 days
+  variable.class<-c(rep('character',2),rep('numeric',7))
+  power.consumption<-read.table('source data/household_power_consumption.txt',header=TRUE,
+                                sep=';',na.strings='?',colClasses=variable.class)
+  power.consumption<-power.consumption[power.consumption$Date=='1/2/2007' | power.consumption$Date=='2/2/2007',]
   
-  ## Format date to Type Date
-  t$Date <- as.Date(t$Date, "%d/%m/%Y")
+  # clean up the variable names and convert date/time fields
+  cols<-c('Date','Time','GlobalActivePower','GlobalReactivePower','Voltage','GlobalIntensity',
+          'SubMetering1','SubMetering2','SubMetering3')
+  colnames(power.consumption)<-cols
+  power.consumption$DateTime<-dmy(power.consumption$Date)+hms(power.consumption$Time)
+  power.consumption<-power.consumption[,c(10,3:9)]
   
-  ## Filter data set from Feb. 1, 2007 to Feb. 2, 2007
-  t <- subset(t,Date >= as.Date("2007-2-1") & Date <= as.Date("2007-2-2"))
+  # write a clean data set to the directory
+  write.table(power.consumption,file='source data/power_consumption.txt',sep='|',row.names=FALSE)
+} else {
   
-  ## Remove incomplete observation
-  t <- t[complete.cases(t),]
+  power.consumption<-read.table('source data/power_consumption.txt',header=TRUE,sep='|')
+  power.consumption$DateTime<-as.POSIXlt(power.consumption$DateTime)
   
-  ## Combine Date and Time column
-  dateTime <- paste(t$Date, t$Time)
-  
-  ## Name the vector
-  dateTime <- setNames(dateTime, "DateTime")
-  
-  ## Remove Date and Time column
-  t <- t[ ,!(names(t) %in% c("Date","Time"))]
-  
-  ## Add DateTime column
-  t <- cbind(dateTime, t)
-  
-  ## Format dateTime Column
-  t$dateTime <- as.POSIXct(dateTime)
+}
+
+# remove the large raw data set 
+if (file.exists('source data/household_power_consumption.txt')) {
+  x<-file.remove('source data/household_power_consumption.txt')
+}
